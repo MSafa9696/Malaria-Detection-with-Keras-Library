@@ -1,0 +1,139 @@
+def date_time(x):
+    if x==1:
+        return 'Timestamp: {:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now())
+    if x==2:    
+        return 'Timestamp: {:%Y-%b-%d %H:%M:%S}'.format(datetime.datetime.now())
+    if x==3:  
+        return 'Date now: %s' % datetime.datetime.now()
+    if x==4:  
+        return 'Date today: %s' % datetime.date.today()  
+
+input_directory = r"../input/cell_images/cell_images"
+output_directory = r"../output/"
+
+training_dir = input_directory
+# testing_dir = input_directory + r"test"
+
+if not os.path.exists(output_directory):
+    os.mkdir(output_directory)
+    
+figure_directory = "../output/figures"
+if not os.path.exists(figure_directory):
+    os.mkdir(figure_directory)
+    
+    
+file_name_pred_batch = figure_directory+r"/result"
+file_name_pred_sample = figure_directory+r"/sample"
+
+def plot_image(file, directory=None, sub=False, aspect=None):
+    path = directory + file
+    
+    img = plt.imread(path)
+    
+    plt.imshow(img, aspect=aspect)
+#     plt.title(file)
+    plt.xticks([])
+    plt.yticks([])
+    
+    if sub:
+        plt.show()
+        
+def plot_img_dir(directory=training_dir, count=5):
+    selected_files = random.sample(os.listdir(directory), count)
+    
+    ncols = 5
+    nrows = count//ncols if count%ncols==0 else count//ncols+1
+    
+    figsize=(20, ncols*nrows)
+
+    ticksize = 14
+    titlesize = ticksize + 8
+    labelsize = ticksize + 5
+
+  params = {'figure.figsize' : figsize,
+              'axes.labelsize' : labelsize,
+              'axes.titlesize' : titlesize,
+              'xtick.labelsize': ticksize,
+              'ytick.labelsize': ticksize}
+
+    plt.rcParams.update(params)
+    
+    i=0
+    
+    for file in selected_files:        
+        plt.subplot(nrows, ncols, i+1)
+        path = directory + file
+        plot_image(file, directory, aspect=None)
+
+        i=i+1
+    
+    plt.tight_layout()
+    plt.show()
+    
+def plot_img_dir_main(directory=training_dir, count=5):
+    labels = os.listdir(directory)
+    for label in labels:
+        print(label)
+        plot_img_dir(directory=directory+"/"+label+"/", count=count)
+
+plot_img_dir_main(directory=training_dir, count=5)
+
+def get_data(batch_size=32, target_size=(299, 299), class_mode="categorical", training_dir=training_dir, testing_dir=None):
+    print("Preprocessing and Generating Data Batches.......\n")
+    
+    rescale = 1.0/255
+
+    train_batch_size = batch_size
+    test_batch_size = batch_size
+    
+    train_shuffle = True
+    val_shuffle = True
+    test_shuffle = False
+    
+    train_datagen = ImageDataGenerator(
+        horizontal_flip=True,
+        vertical_flip=True,
+        rotation_range=45,
+        shear_range=16,
+        rescale=rescale,
+        validation_split=0.25)
+
+    train_generator = train_datagen.flow_from_directory(
+        training_dir,
+        target_size=target_size, 
+        class_mode=class_mode, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        seed=42,
+        subset='training')
+    
+    validation_generator = train_datagen.flow_from_directory(
+        training_dir, 
+        target_size=target_size, 
+        class_mode=class_mode, 
+        batch_size=1024, 
+        shuffle=True, 
+        seed=42,
+        subset='validation')
+    
+    test_datagen = ImageDataGenerator(rescale=rescale)
+    
+    test_generator = None
+    
+    
+    class_weights = get_weight(train_generator.classes)
+    
+    steps_per_epoch = len(train_generator)
+    validation_steps = len(validation_generator)
+    
+    print("\nPreprocessing and Data Batch Generation Completed.\n")
+
+ return train_generator, validation_generator, test_generator, class_weights, steps_per_epoch, validation_steps
+
+# Calculate Class Weights
+def get_weight(y):
+    class_weight_current =  cw.compute_class_weight('balanced', np.unique(y), y)
+    return class_weight_current
+
+
+

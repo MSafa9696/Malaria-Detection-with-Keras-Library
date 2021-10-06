@@ -1,0 +1,183 @@
+main_model_dir = output_directory + r"models/"
+main_log_dir = output_directory + r"logs/"
+
+try:
+    os.mkdir(main_model_dir)
+except:
+    print("Could not create main model directory")
+    
+try:
+    os.mkdir(main_log_dir)
+except:
+    print("Could not create main log directory")
+
+
+
+model_dir = main_model_dir + time.strftime('%Y-%m-%d %H-%M-%S') + "/"
+log_dir = main_log_dir + time.strftime('%Y-%m-%d %H-%M-%S')
+
+
+try:
+    os.mkdir(model_dir)
+except:
+    print("Could not create model directory")
+    
+try:
+    os.mkdir(log_dir)
+except:
+    print("Could not create log directory")
+model_file = model_dir + "{epoch:02d}-val_acc-{val_acc:.2f}-val_loss-{val_loss:.2f}.hdf5"
+    
+print("Settting Callbacks")
+
+checkpoint = ModelCheckpoint(
+    model_file, 
+    monitor='val_acc', 
+    save_best_only=True)
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=2,
+    verbose=1,
+    restore_best_weights=True)
+
+
+reduce_lr = ReduceLROnPlateau(
+    monitor='val_loss',
+    factor=0.6,
+    patience=1,
+    verbose=1)
+
+callbacks = [reduce_lr, early_stopping, checkpoint]
+
+callbacks = [checkpoint, reduce_lr, early_stopping]
+
+print("Set Callbacks at ", date_time(1))
+
+print("Getting Base Model", date_time(1))
+
+# input_shape = (96, 96, 3)
+input_shape = (224, 224, 3)
+
+num_class = 2
+
+
+model = get_model(model_name="NASNetMobile", input_shape=input_shape, num_class=num_class)
+# model = get_conv_model(input_shape=input_shape)
+
+print("Loaded Base Model", date_time(1))
+
+loss = 'categorical_crossentropy'
+# loss = 'binary_crossentropy'
+metrics = ['acc']
+# metrics = [auroc]
+
+# batch_size = 32
+batch_size = 176
+
+class_mode = "categorical"
+# class_mode = "binary"
+
+# target_size=(96, 96)
+target_size=(224, 224)
+
+train_generator, validation_generator, test_generator, class_weights, steps_per_epoch, validation_steps = get_data(batch_size=batch_size, target_size=target_size, class_mode=class_mode)
+
+#Training
+print("Starting Trainning ...\n")
+
+start_time = time.time()
+print(date_time(1))
+
+# batch_size = 32
+# train_generator, validation_generator, test_generator, class_weights, steps_per_epoch, validation_steps = get_data(batch_size=batch_size)
+
+print("\n\nCompliling Model ...\n")
+learning_rate = 0.0001
+optimizer = Adam(learning_rate)
+# optimizer = Adam()
+
+model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+
+# steps_per_epoch = 180
+# validation_steps = 40
+
+verbose = 1
+epochs = 10
+
+print("Trainning Model ...\n")
+history = model.fit_generator(
+    train_generator,
+    steps_per_epoch=steps_per_epoch,
+    epochs=epochs,
+    verbose=verbose,
+    callbacks=callbacks,
+validation_data=validation_generator,
+    validation_steps=validation_steps, 
+    class_weight=class_weights)
+
+elapsed_time = time.time() - start_time
+elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
+
+print("\nElapsed Time: " + elapsed_time)
+print("Completed Model Trainning", date_time(1))
+
+#Model Performance
+def plot_performance(history=None, figure_directory=None):
+    xlabel = 'Epoch'
+    legends = ['Training', 'Validation']
+
+    ylim_pad = [0.005, 0.005]
+#     ylim_pad = [0, 0]
+
+
+    plt.figure(figsize=(20, 5))
+
+    # Plot training & validation Accuracy values
+
+    y1 = history.history['acc']
+    y2 = history.history['val_acc']
+
+    min_y = min(min(y1), min(y2))-ylim_pad[0]
+    max_y = max(max(y1), max(y2))+ylim_pad[0]
+
+
+    plt.subplot(121)
+
+    plt.plot(y1)
+    plt.plot(y2)
+
+    plt.title('Model Accuracy\n'+date_time(1), fontsize=17)
+    plt.xlabel(xlabel, fontsize=15)
+    plt.ylabel('Accuracy', fontsize=15)
+    plt.ylim(min_y, max_y)
+    plt.legend(legends, loc='upper left')
+    plt.grid()
+
+ # Plot training & validation loss values
+
+    y1 = history.history['loss']
+    y2 = history.history['val_loss']
+
+    min_y = min(min(y1), min(y2))-ylim_pad[1]
+    max_y = max(max(y1), max(y2))+ylim_pad[1]
+
+
+    plt.subplot(122)
+
+    plt.plot(y1)
+    plt.plot(y2)
+
+    plt.title('Model Loss\n'+date_time(1), fontsize=17)
+    plt.xlabel(xlabel, fontsize=15)
+    plt.ylabel('Loss', fontsize=15)
+    plt.ylim(min_y, max_y)
+    plt.legend(legends, loc='upper left')
+    plt.grid()
+    if figure_directory:
+        plt.savefig(figure_directory+"/history")
+
+    plt.show()
+plot_performance(history=history)
+
+
